@@ -1,0 +1,178 @@
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  font-size: 14px;
+  font-weight: 300;
+  background-color: #ECECEC;
+  color: #333;
+  font-family: 'Open Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust:none;
+  margin-bottom: 30px;
+  padding-bottom: 30px;
+  overflow: auto;
+}
+
+a {
+  font-family: 'Poppins', sans-serif;
+  color:#002b6f;
+  font-size:1em;
+  font-weight:bold
+}
+
+.navbar a{
+  font-family: 'Open Sans', sans-serif;
+  color: #ECECEC;
+}
+
+.navbar a:hover{
+  color: #ECECEC;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.hidden {
+  display: none;
+}
+
+.tinytext{
+  font-size:.8em
+}
+
+.card {
+  background-color: #fdfcfd;
+  border: 1px solid #D2D2D2;
+}
+
+#gameTable {
+  border-spacing: 0;
+  text-align: left;
+  border-collapse: collapse;
+  width: 100%;
+  border: 1px solid #D2D2D2;
+}
+
+#gameTable tr th {
+  background-color: #ECECEC;
+  height: 32px;
+}
+
+
+#gameTable th.col-time {
+  width: 140px;
+}
+#gameTable th.col-stream {
+  width: 280px;
+}
+
+
+.free-game {
+  border: 2px solid #f93;
+}
+
+.free-game .free-game-txt {
+  color: #f93;
+  font-size: 12px;
+}
+
+.blackout,.blackout a{
+  text-decoration:line-through;
+}
+
+
+.mvSync {
+  vertical-align:top;
+  font-size:.8em;
+  width:6em;
+}
+
+
+.section {
+  padding: 25px 0;
+}
+
+.player {
+  padding: 10px 0;
+}
+
+.nav-link {
+  font-size: 16px;
+  font-weight: bold;
+  padding: 10px 20px !important;
+}
+
+.navbar-light .navbar-nav .nav-link {
+  color: rgb(85, 85, 85);
+}
+
+
+.navbar-nav li:hover>ul.dropdown-menu {
+  display: block;
+}
+
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+}
+
+/* rotate caret on hover */
+.dropdown-menu>li>a:hover:after {
+  text-decoration: underline;
+  transform: rotate(-90deg);
+}
+
+.navigation, .navbar{
+  background-color: rgb(0, 12, 55);
+}
+
+footer {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  text-align: center;
+  padding: 25px 0px;
+}
+
+
+.footer-menu a {
+  font-size: 14;
+  font-weight: 700;
+  color: #444;
+  padding: 10px;
+  text-decoration: none;
+}
+
+.footer-menu a:hover {
+  text-decoration: underline;
+}
+
+footer .footer-logo {
+  color: rgb(85, 85, 85);
+  display: block;
+}
+
+footer p.copyright-text {
+  font-weight: 300;
+  font-size: 12px;
+  color: rgb(85, 85, 85);
+  letter-spacing: 1.5px;
+  margin-top: 10px;
+}
+
+footer p.copyright-text a {
+  color: #282828;
+}
+
+footer p.copyright-text a:hover {
+  text-decoration: none;
+}

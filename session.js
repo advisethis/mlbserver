@@ -832,6 +832,7 @@ class sessionClass {
     // Define some file paths and names
     this.DATA_DIRECTORY = path.join(dirname, 'data')
     this.CACHE_DIRECTORY = path.join(dirname, 'cache')
+    this.ASSETS_DIRECTORY = path.join(dirname, 'assets')
 
     this.CREDENTIALS_FILE = path.join(dirname, 'credentials.json')
     this.PROTECTION_FILE = path.join(dirname, 'protection.json')
@@ -1170,6 +1171,7 @@ class sessionClass {
     if ( offset > 0 ) {
       newDate += "-"
     } else {
+      offset = Number(String(offset).substring(1,offset.length));
       newDate += "+"
     }
     newDate += String((offset / 60)).padStart(2, '0') + "00"
