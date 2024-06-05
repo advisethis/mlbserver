@@ -2256,15 +2256,19 @@ class sessionClass {
       var body = ''
       // output M3U channel data, if requested
       if ( dataType == 'channels' ) {
-        body = '#EXTM3U' + "\n"
+          body = '#EXTM3U' + "\n"
+          // output ICS calendar data, if requested
+      } else if (dataType == 'calendar') {
+          body = 'BEGIN:VCALENDAR' + "\n" + 'PRODID:-//mlbserver//MLB Calendar//EN' + "\n" + 'VERSION:2.0'
       // otherwise output XML guide data
       } else {
         body = '<?xml version="1.0" encoding="UTF-8"?>' + "\n" +
         '<!DOCTYPE tv SYSTEM "xmltv.dd">' + "\n" +
         '  <tv generator-info-name="mlbserver" source-info-name="mlbserver">'
       }
-      var channels = {}
-      var programs = ""
+        var channels = {}
+        var calendar = ""
+        var programs = ""
 
       try {
         this.debuglog('getTVData processing')
@@ -2287,7 +2291,9 @@ class sessionClass {
           if ( (includeLevels.length > 1) || !includeLevels.includes('ALL') ) {
             let level_list = []
             for (let i = 0; i < includeLevels.length; i++) {
-              level_list.push(LEVELS[includeLevels[i]])
+                if (LEVELS[includeLevels[i]]) {
+                    level_list.push(LEVELS[includeLevels[i]])
+                }
             }
             level_ids = level_list.toString()
           }
@@ -2295,7 +2301,9 @@ class sessionClass {
           if ( includeOrgs.length > 0 ) {
             team_ids = this.getTeamIds()
             for (let i = 0; i < includeOrgs.length; i++) {
-              team_ids += ',' + AFFILIATE_TEAM_IDS[includeOrgs[i]]
+                if (AFFILIATE_TEAM_IDS[includeOrgs[i]]) {
+                    team_ids += ',' + AFFILIATE_TEAM_IDS[includeOrgs[i]]
+                }
             }
           } else if ( includeTeams.length > 0 ) {
             team_ids = this.getTeamIds()
@@ -2307,7 +2315,7 @@ class sessionClass {
           } else {
             team_ids = this.getTeamIds()
             for (let i=0; i<this.credentials.fav_teams.length; i++) {
-              if ( this.credentials.fav_teams[i] != '' ) {
+                if ((this.credentials.fav_teams[i] != '') && AFFILIATE_TEAM_IDS[this.credentials.fav_teams[i]]) {
                 team_ids += ',' + AFFILIATE_TEAM_IDS[this.credentials.fav_teams[i]]
               }
             }
@@ -2415,11 +2423,20 @@ class sessionClass {
                       } else if ( cache_data.dates[i].games[j].status.startTimeTBD == true ) {
                         continue
                       }
-                      let start = this.convertDateToXMLTV(gameDate)
-                      gameDate.setHours(gameDate.getHours()+gameHours)
-                      let stop = this.convertDateToXMLTV(gameDate)
+                        let start = this.convertDateToXMLTV(gameDate)
+                        let calendar_start = gameDate
+                        gameDate.setHours(gameDate.getHours()+gameHours)
+                        let stop = this.convertDateToXMLTV(gameDate)
+                        let calendar_stop = gameDate
 
-                      programs += await this.generate_xml_program(channelid, start, stop, title, description, logo)
+                        // MILB calendar ICS
+                        let prefix = 'Watch'
+                        let location = server + '/embed.html?team=' + encodeURIComponent(team) + '&mediaType=' + streamMediaType
+                        if (this.protection.content_protect) location += '&content_protect=' + this.protection.content_protect
+                        calendar += await this.generate_ics_event(prefix, calendar_start, calendar_stop, title, description, location)
+
+                        // MILB guide XML
+                        programs += await this.generate_xml_program(channelid, start, stop, title, description, logo)
 
                       break
                     }
@@ -2580,11 +2597,33 @@ class sessionClass {
                               gameDate.setHours(gameDate.getHours()+4)
                             } else if ( cache_data.dates[i].games[j].status.startTimeTBD == true ) {
                               continue
-                            }
-                            let start = this.convertDateToXMLTV(gameDate)
+                              }
+
+                              let start = this.convertDateToXMLTV(gameDate)
+                            let calendar_start = gameDate
                             gameDate.setHours(gameDate.getHours()+gameHours)
                             let stop = this.convertDateToXMLTV(gameDate)
 
+                              let calendar_stop = gameDate
+
+                              // MLB calendar ICS
+                              let prefix = 'Watch'
+                              if (mediaType == 'Audio') {
+                                  prefix = 'Listen'
+                                  if (language == 'es') {
+                                      prefix += ' (in Spanish)'
+                                  }
+                                  prefix += ' to'
+                              }
+                              let location = server + '/embed.html?team=' + encodeURIComponent(team) + '&mediaType=' + streamMediaType
+                              if (streamMediaType == 'Video') {
+                                  location += '&resolution=' + resolution
+                              }
+                              if (includeBlackouts == 'true') location += '&includeBlackouts=' + includeBlackouts
+                              if (this.protection.content_protect) location += '&content_protect=' + this.protection.content_protect
+                              calendar += await this.generate_ics_event(prefix, calendar_start, calendar_stop, title, description, location)
+
+                              // MLB guide XML
                             programs += await this.generate_xml_program(channelid, start, stop, title, description, icon)
                           }
                         }
@@ -2638,6 +2677,13 @@ class sessionClass {
                   let start = this.convertDateToXMLTV(new Date(big_inning.start))
                   let stop = this.convertDateToXMLTV(new Date(big_inning.end))*/
 
+                    // Big Inning calendar ICS
+                    let prefix = 'Watch'
+                    let location = server + '/embed.html?event=biginning&mediaType=Video&resolution=' + resolution
+                    if (this.protection.content_protect) location += '&content_protect=' + this.protection.content_protect
+                    calendar += await this.generate_ics_event(prefix, new Date(this.cache.bigInningSchedule[gameDate].start), new Date(this.cache.bigInningSchedule[gameDate].end), title, description, location)
+
+                    // Big Inning guide XML
                   programs += await this.generate_xml_program(channelid, start, stop, title, description, logo)
                 }
                 this.debuglog('getTVData completed Big Inning for date ' + cache_data.dates[i].date)
@@ -2655,7 +2701,8 @@ class sessionClass {
               let channelid = mediaType + '.GAMECHANGER'
               let logo = server + '/image.svg?teamId=MLB'
               if ( this.protection.content_protect ) logo += '&amp;content_protect=' + this.protection.content_protect
-              let stream = server + '/gamechanger.m3u8?resolution=' + resolution
+                let stream = server + '/gamechanger.m3u8?resolution=' + resolution
+                if (this.protection.content_protect) stream += '&content_protect=' + this.protection.content_protect
               if ( pipe == 'true' ) stream = await this.convert_stream_to_pipe(stream, channelid)
               channels[channelid] = await this.create_channel_object(channelid, logo, stream, mediaType)
 
@@ -2674,6 +2721,13 @@ class sessionClass {
                     gameDate.setHours(gameDate.getHours()+4)
                     let stop = this.convertDateToXMLTV(gameDate)
 
+                      // Game Changer calendar ICS
+                      let prefix = 'Watch'
+                      let location = server + '/embed.html?src=' + encodeURIComponent(stream)
+                      if (this.protection.content_protect) location += '&content_protect=' + this.protection.content_protect
+                      calendar += await this.generate_ics_event(prefix, new Date(cache_data.dates[i].games[gameIndexes.firstGameIndex].gameDate), gameDate, title, description, location)
+
+                      // Game Changer guide XML
                     programs += await this.generate_xml_program(channelid, start, stop, title, description, logo)
                   }
                   this.debuglog('getTVData completed Game Changer for date ' + cache_data.dates[i].date)
@@ -2711,6 +2765,13 @@ class sessionClass {
                     gameDate.setHours(gameDate.getHours()+4)
                     let stop = this.convertDateToXMLTV(gameDate)
 
+                      // Multview calendar ICS
+                      let prefix = 'Watch'
+                      let location = server + '/embed.html?src=' + encodeURIComponent(stream)
+                      if (this.protection.content_protect) location += '&content_protect=' + this.protection.content_protect
+                      calendar += await this.generate_ics_event(prefix, new Date(cache_data.dates[i].games[gameIndexes.firstGameIndex].gameDate), gameDate, title, description, location)
+
+                      // Multview guide XML
                     programs += await this.generate_xml_program(channelid, start, stop, title, description, logo)
                   }
                   this.debuglog('getTVData completed Multiview for date ' + cache_data.dates[i].date)
@@ -2732,6 +2793,9 @@ class sessionClass {
           body += value.stream + "\n"
           channelnumber++
         }
+      // output ICS calendar data, if requested
+      } else if (dataType == 'calendar') {
+          body += calendar + "\n" + 'END:VCALENDAR'
       // otherwise output XML guide data
       } else {
         for (const [key, value] of Object.entries(channels)) {
@@ -4270,6 +4334,17 @@ class sessionClass {
     }
     return mediaInfo
   }
+
+date_to_ics_format(aDate) {
+    return aDate.getUTCFullYear().toString() +
+        ((aDate.getUTCMonth() + 1) < 10 ? "0" + (aDate.getUTCMonth() + 1).toString() : (aDate.getUTCMonth() + 1).toString()) +
+        (aDate.getUTCDate() < 10 ? "0" + aDate.getUTCDate().toString() : aDate.getUTCDate().toString()) + 'T' + (aDate.getUTCHours() < 10 ? "0" + aDate.getUTCHours().toString() : aDate.getUTCHours().toString()) + (aDate.getUTCMinutes() < 10 ? "0" + aDate.getUTCMinutes().toString() : aDate.getUTCMinutes().toString()) + '00Z';
+}
+
+async generate_ics_event(prefix, start, stop, title, description, location) {
+    let ics_start = this.date_to_ics_format(start)
+    return "\n" + 'BEGIN:VEVENT' + "\n" + 'UID:' + title.replace(/\W/g, '') + '@' + ics_start.replace(/\W/g, '') + "\n" + 'DTSTAMP:' + this.date_to_ics_format(new Date()) + "\n" + 'SUMMARY:' + prefix + ' ' + title + "\n" + 'DTSTART:' + ics_start + "\n" + 'DTEND:' + this.date_to_ics_format(stop) + "\n" + 'DESCRIPTION:' + description + "\n" + 'LOCATION:' + location + "\n" + 'BEGIN:VALARM' + "\n" + 'ACTION:DISPLAY' + "\n" + 'DESCRIPTION:Reminder' + "\n" + 'TRIGGER:-PT0M' + "\n" + 'END:VALARM' + "\n" + 'END:VEVENT'
+}
 
   async generate_xml_program(channelid, start, stop, title, description, icon) {
     return "\n" + '    <programme channel="' + channelid + '" start="' + start + '" stop="' + stop + '">' + "\n" +

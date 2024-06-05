@@ -1,6 +1,6 @@
 {
   "name": "mlbserver",
-  "version": "2024.05.21",
+  "version": "2024.05.27",
   "description": "",
   "repository": {
     "type": "git",
@@ -26,5 +26,8 @@
   "bugs": {
     "url": "https://github.com/tonywagner/mlbserver/issues"
   },
-  "homepage": "https://github.com/tonywagner/mlbserver#readme"
+  "homepage": "https://github.com/tonywagner/mlbserver#readme",
+  "devDependencies": {
+    "eslint": "^9.4.0"
+  }
 }

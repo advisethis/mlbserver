@@ -128,7 +128,7 @@ var argv = minimist(process.argv, {
     e: 'env'
   },
   boolean: ['ffmpeg_logging', 'debug', 'logout', 'session', 'cache', 'version', 'free', 'env'],
-  string: ['port', 'account_username', 'account_password', 'zip_code', 'country', 'fav_teams', 'multiview_port', 'multiview_path', 'ffmpeg_path', 'ffmpeg_encoder', 'page_username', 'page_password', 'content_protect', 'gamechanger_delay', 'data_directory']
+  string: ['account_username', 'account_password', 'zip_code', 'country', 'fav_teams', 'multiview_path', 'ffmpeg_path', 'ffmpeg_encoder', 'page_username', 'page_password', 'content_protect', 'data_directory']
 })
 
 if (argv.env) argv = process.env
@@ -585,7 +585,7 @@ function getMasterPlaylist(streamURL, req, res, options = {}) {
                 //var parsed = line.match(/URI="([^"]+)"?$/)
                 var parsed = line.match(',URI="([^"]+)"')
                 if ( parsed[1] ) {
-                  newurl = '/playlist?url='+encodeURIComponent(url.resolve(streamURL, parsed[1].trim()))
+                  newurl = '/playlist?url=' + encodeURIComponent(url.resolve(streamURL, parsed[1].trim())) + content_protect + referer_parameter
                   if ( force_vod != VALID_FORCE_VOD[0] ) newurl += '&force_vod=on'
                   if ( inning_half != VALID_INNING_HALF[0] ) newurl += '&inning_half=' + inning_half
                   if ( inning_number != VALID_INNING_NUMBER[0] ) newurl += '&inning_number=' + inning_number
@@ -860,7 +860,12 @@ app.get('/playlist', async function(req, res) {
 
         if (line[0] === '#') return line
 
-        let newline = '/ts?url='+encodeURIComponent(url.resolve(u, line.trim())) + content_protect + referer_parameter
+        let newline = '/ts'
+        if (line.includes('.vtt')) {
+            newline = '/vtt'
+        }
+
+        newline += '?url=' + encodeURIComponent(url.resolve(u, line.trim())) + content_protect + referer_parameter
         if ( key ) newline += '&key='+encodeURIComponent(key) + '&iv='+encodeURIComponent(iv)
 
         return newline
@@ -958,6 +963,49 @@ app.get('/ts', async function(req, res) {
     }
   })
 })
+
+// Listen for WebVTT subtitle requests
+app.get('/vtt', async function (req, res) {
+    if (!(await protect(req, res))) return
+
+    session.requestlog('vtt', req, true)
+
+    delete req.headers.host
+
+    var u = req.query.url
+    session.debuglog('vtt url : ' + u)
+
+    var referer = false
+    if (req.query.referer) {
+        referer = decodeURIComponent(req.query.referer)
+        session.debuglog('found vtt referer : ' + referer)
+    }
+
+    var req = function () {
+        var headers = {}
+        if (referer) {
+            headers.referer = referer
+            headers.origin = getOriginFromURL(referer)
+        }
+
+        requestRetry(u, headers, function (err, response) {
+            if (err) return res.error(err)
+
+            var body = response.body
+
+            session.debuglog(body)
+            respond(response, res, Buffer.from(body))
+        })
+    }
+
+    return req()
+
+    requestRetry(u, headers, function (err, res) {
+        if (err) return res.error(err)
+        req()
+    })
+})
+
 
 
 // Listen for gamechanger.m3u master playlist requests
@@ -2357,7 +2405,7 @@ app.get('/', async function(req, res) {
     body += '<div id="panelsStayOpen-pnPlaylists" class="accordion-collapse collapse" aria-labelledby="panelsStayOpen-playlists">' + "\n"
     body += '<div class="accordion-body">' + "\n"
        
-    body += '<label class="col-auto col-form-label" for="selType">Live Channel Playlist and XMLTV Guide : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Allows you to generate a M3U playlist of channels, and an XML file of guide listings for those channels, to import into TV/DVR/PVR software like Tvheadend or Jellyfin. NOTE: May be helpful to specify a resolution above."><i class="bi bi-question-lg"></i></a></label>' + "\n"
+      body += '<label class="col-auto col-form-label" for="selType">Live Channel Playlist, XMLTV Guide, ICS Calendar : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Allows you to generate a M3U playlist of channels, and an XML file of guide listings for those channels, to import into TV/DVR/PVR software like Tvheadend or Jellyfin. You can also subscribe to the calendar links in your preferred calendar program/service to set up event notifications. NOTE: May be helpful to specify a resolution above."><i class="bi bi-question-lg"></i></a></label>' + "\n"
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Scan Mode : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="During setup, some TV/DVR/PVR software will attempt to load all stream URLs. Turning Scan Mode ON will return a sample stream for all stream requests, thus satisfying that software without overloading mlbserver or excluding streams which aren\'t currently live. Once the channels are set up, turning Scan Mode OFF will restore normal stream behavior. WARNING: Be sure your TV/DVR/PVR software doesn\'t periodically scan all channels automatically or you might overload mlbserver."><i class="bi bi-question-lg"></i></a></label>' + "\n"
     body += '<div class="col-auto">' + "\n"
@@ -2382,7 +2430,7 @@ app.get('/', async function(req, res) {
    
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">All : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Will include all live MLB broadcasts. If favorite team(s) have been provided, it will also include affiliate games for those organizations. If a zip code has been provided, channels/games subject to blackout will be omitted by default. See below for an additional option to override that."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + content_protect_b + '">calendar.ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
 
@@ -2393,12 +2441,12 @@ app.get('/', async function(req, res) {
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">By Team : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Including a team (MLB only, by abbreviation, in a comma-separated list if more than 1) will include all of its broadcasts, or if that team is not broadcasting the game, it will include the national broadcast or opponent\'s broadcast if available. It will also include affiliate games for those organizations. If a zip code has been provided, channels/games subject to blackout will be omitted by default. See below for an additional option to override that."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=' + include_teams + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=' + include_teams + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=' + include_teams + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=' + include_teams + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeTeams=' + include_teams + content_protect_b + '">calendar.ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Include blackouts : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="An optional parameter added to the URL will include channels/games subject to blackout (although you may not be able to play those games)"><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=' + include_teams + '&includeBlackouts=true' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=' + include_teams + '&includeBlackouts=true' + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=' + include_teams + '&includeBlackouts=true' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=' + include_teams + '&includeBlackouts=true' + content_protect_b + '">guide.xml</a>  and <a href="/calendar.ics?mediaType=' + mediaType + '&includeTeams=' + include_teams + '&includeBlackouts=true' + content_protect_b + '">calendar.ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
 
@@ -2409,17 +2457,17 @@ app.get('/', async function(req, res) {
     }
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Exclude a Team + National : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="This is useful for excluding games you may be blacked out from, even if you have not provided a zip code. Excluding a team (MLB only, by abbreviation, in a comma-separated list if more than 1) will exclude every game involving that team. National refers to USA national TV broadcasts."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&excludeTeams=' + exclude_teams + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&excludeTeams=' + exclude_teams + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&excludeTeams=' + exclude_teams + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&excludeTeams=' + exclude_teams + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&excludeTeams=' + exclude_teams + content_protect_b + '">ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Include (or exclude) LIDOM : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Dominican Winter League, aka Liga de Beisbol Dominicano. Live stream only, does not support starting from the beginning or certain innings, skip options, etc."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=lidom' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=lidom' + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=lidom' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=lidom' + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeTeams=lidom' + content_protect_b + '">ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Include (or exclude) Big Inning : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Big Inning is the live look-in and highlights show."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=biginning' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=biginning' + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=biginning' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=biginning' + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeTeams=biginning' + content_protect_b + '">ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
 
@@ -2429,30 +2477,30 @@ app.get('/', async function(req, res) {
     }
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Include (or exclude) Game Changer : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="The game changer stream will automatically switch between the highest leverage active live non-blackout games, and should be available whenever there are such games available. Does not support adaptive bitrate switching, will default to best resolution if not specified."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + gamechanger_resolution + '&includeTeams=gamechanger' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=gamechanger' + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + gamechanger_resolution + '&includeTeams=gamechanger' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=gamechanger' + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeTeams=gamechanger' + content_protect_b + '">ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Include (or exclude) Multiview : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Requires starting and stopping the multiview stream from the web interface."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&includeTeams=multiview' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=multiview' + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&includeTeams=multiview' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=multiview' + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeTeams=multiview' + content_protect_b + '">ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
     
     if ( argv.free ) {
       body += '<div class="row mb-3">' + "\n"
       body += '<label class="col-auto col-form-label" for="selType">Free games only : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Only includes games marked as free. Blackouts still apply. If a zip code has been provided, channels/games subject to blackout will be omitted by default."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=free' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=free' + content_protect_b + '">guide.xml</a></div>' + "\n"
+        body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeTeams=free' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeTeams=free' + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeTeams=free' + content_protect_b + '">ics</a></div>' + "\n"
       body += '</div>' + "\n"
     }
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Include organizational affiliates : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Including an organization (by MLB team abbreviation, in a comma-separated list if more than 1) will include all of its affiliate broadcasts, or if that affiliate is not broadcasting the game, it will include the opponent\'s broadcast if available. If this option is not specified, but favorite team(s) have been provided, affiliate games for those organizations will be included anyway."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeOrgs=cin,tor,cle' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeOrgs=cin,tor,cle' + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeOrgs=cin,tor,cle' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeOrgs=cin,tor,cle' + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeOrgs=atl,az' + content_protect_b + '">ics</a></div>' + "\n"
     body += '</div>' + "\n"
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Include by Level : <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Including a level (AAA, AA, A+ encoded as A%2B, or A, in a comma-separated list if more than 1) will include all of its broadcasts, and exclude all other levels."><i class="bi bi-question-lg"></i></a></label>' + "\n"
-    body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeLevels=a%2B,aaa' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeLevels=a%2B,aaa' + content_protect_b + '">guide.xml</a></div>' + "\n"
+      body += '<div class="col-auto col-form-label"><a href="/channels.m3u?mediaType=' + mediaType + '&resolution=' + resolution + '&includeLevels=a%2B,aaa' + content_protect_b + '">channels.m3u</a> and <a href="/guide.xml?mediaType=' + mediaType + '&includeLevels=a%2B,aaa' + content_protect_b + '">guide.xml</a> and <a href="/calendar.ics?mediaType=' + mediaType + '&includeLevels=a%2B,aaa' + content_protect_b + '">ics</a></div>' + "\n"
     body += '</div>' + "\n"
     body += '</div>' + "\n"
     body += '</div>' + "\n"
@@ -2913,6 +2961,57 @@ app.get('/channels.m3u', async function(req, res) {
   res.writeHead(200, {'Content-Type': 'audio/x-mpegurl'})
   res.end(body)
 })
+
+
+// Listen for calendar.ics requests
+app.get('/calendar.ics', async function (req, res) {
+    if (!(await protect(req, res))) return
+
+    try {
+        session.requestlog('calendar.ics', req)
+
+        let mediaType = VALID_MEDIA_TYPES[0]
+        if (req.query.mediaType) {
+            mediaType = req.query.mediaType
+        }
+
+        let includeTeams = []
+        if (req.query.includeTeams) {
+            includeTeams = req.query.includeTeams.toUpperCase().split(',')
+        }
+        let excludeTeams = []
+        if (req.query.excludeTeams) {
+            excludeTeams = req.query.excludeTeams.toUpperCase().split(',')
+        }
+
+        let includeBlackouts = 'false'
+        if (req.query.includeBlackouts) {
+            includeBlackouts = req.query.includeBlackouts
+        }
+
+        let includeLevels = []
+        if (req.query.includeLevels) {
+            includeLevels = decodeURIComponent(req.query.includeLevels.toUpperCase()).split(',')
+        }
+
+        let includeOrgs = []
+        if (req.query.includeOrgs) {
+            includeOrgs = req.query.includeOrgs.toUpperCase().split(',')
+        }
+
+        let server = 'http://' + req.headers.host
+
+        var body = await session.getTVData('calendar', mediaType, includeTeams, excludeTeams, includeLevels, includeOrgs, server, includeBlackouts)
+
+        res.writeHead(200, { 'Content-Type': 'text/calendar' })
+        res.end(body)
+    } catch (e) {
+        session.log('calendar.ics request error : ' + e.message)
+        res.end('calendar.ics request error, check log')
+    }
+})
+
+
 
 // Listen for guide.xml request
 app.get('/guide.xml', async function(req, res) {
