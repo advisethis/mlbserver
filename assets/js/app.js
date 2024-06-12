@@ -172,6 +172,43 @@ $(document).ready(function () {
         var prevPage = window.location.href;
         window.history.go(-1);
     }
+
+    function toggleAudio(x) {
+        var elements = document.getElementsByClassName("audioButton");
+        for (var i = 0; i < elements.length; i++)
+        {
+            elements[i].className = "audioButton"
+        }
+        document.getElementById("audioButton" + x).className += " default"; hls.audioTrack = x
+    }
+    function changeTime(x) {
+        video.currentTime += x
+    }
+    function changeRate(x) {
+        let newRate = Math.round((Number(document.getElementById("playback_rate").value) + x) * 10) / 10;
+        if ((newRate <= document.getElementById("playback_rate").max) && (newRate >= document.getElementById("playback_rate").min)) {
+            document.getElementById("playback_rate").value = newRate.toFixed(1);
+            video.defaultPlaybackRate = video.playbackRate = document.getElementById("playback_rate").value
+        }
+    }
+    function myKeyPress(e)
+    {
+        if (e.key == "ArrowRight") {
+            changeTime(10)
+        }
+        else if (e.key == "ArrowLeft")
+        {
+            changeTime(-10)
+        } else if (e.key == "ArrowUp")
+        {
+            changeRate(0.1)
+        } else if (e.key == "ArrowDown")
+        {
+            changeRate(-0.1)
+        }
+    }
+
+
     
     //Highlights Modal Functions
     var myModal = new bootstrap.Modal(document.getElementById("myModal"), {});

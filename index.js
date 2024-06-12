@@ -1500,7 +1500,7 @@ app.get('/', async function(req, res) {
   
     var body = pageHeader(javascript, content_protect_a);
     body += '<section class="section">' + "\n"
-    body += '<div class="container">' + "\n"
+      body += '<div class="container-xl">' + "\n"
     body += '<div class="row mb-3">Touch or hover over a question mark or i for more details</div>' + "\n"
 
     todayUTCHours -= 4
@@ -2401,7 +2401,7 @@ app.get('/', async function(req, res) {
     body += '<div class="card"><div class="card-body">' + "\n"
     body += '<div class="accordion" id="accordionPanelsStayOpen">' + "\n"
     body += '<div class="accordion-item">' + "\n"
-    body += '<h2 class="accordion-header" id="panelsStayOpen-playlists"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-pnPlaylists" aria-expanded="false" aria-controls="panelsStayOpen-pnPlaylists">Channel Playlists & XMLTV Guides</button></h2>' + "\n"
+    body += '<h2 class="accordion-header" id="panelsStayOpen-playlists"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-pnPlaylists" aria-expanded="false" aria-controls="panelsStayOpen-pnPlaylists">Channel Playlists, XMLTV Guides, & ICS Calendar</button></h2>' + "\n"
     body += '<div id="panelsStayOpen-pnPlaylists" class="accordion-collapse collapse" aria-labelledby="panelsStayOpen-playlists">' + "\n"
     body += '<div class="accordion-body">' + "\n"
        
@@ -2613,14 +2613,6 @@ app.get('/', async function(req, res) {
 
     body += '</div></div>' + "\n" //End Card
 
-    
-    // Datepicker functions
-    //body += '<script>var datePicker=document.getElementById("gameDate");function changeDate(e){date=datePicker.value;reload()}function removeDate(e){datePicker.removeEventListener("change",changeDate,false);datePicker.addEventListener("blur",changeDate,false);if(e.keyCode===13){date=datePicker.value;reload()}}datePicker.addEventListener("change",changeDate,false);datePicker.addEventListener("keypress",removeDate,false)</script>' + "\n"
-
-    // Highlights modal defintion
-    //body += '<div id="myModal" class="modal"><div class="modal-content"><span class="close">&times;</span><div id="highlights"></div></div></div>'
-
-    
     body += '</div>' + "\n"
 
     body += '</section>' + "\n"
@@ -2736,64 +2728,103 @@ app.get('/embed.html', async function(req, res) {
 
     // Adapted from https://hls-js.netlify.app/demo/basic-usage.html and https://hls-js-dev.netlify.app/demo
     
-    javascript = `$(function () {
-      document.addEventListener("DOMContentLoaded", function() 
-      {
-        var pauseButton = document.getElementById("pauseButton"); 
-        pauseButton.addEventListener("click", function() {
-          if (video.paused) {
-            video.play();
-          } else {
-            video.pause();
+    javascript = `
+        $(function () {
+
+            $(window).keydown(function(event){
+                myKeyPress(event);
+            });
+
+          var video = document.getElementById("video");
+          if (Hls.isSupported()) {
+              var hls = new Hls(`;
+                if (startFrom != VALID_START_FROM[1]) {
+                    javascript += `{
+                            startPosition:0,
+                            liveSyncDuration:32400,
+                            liveMaxLatencyDuration:32410
+                        }`;
+                }
+                javascript += `);
+              hls.loadSource("` + video_url + `");
+              hls.attachMedia(video);
+              hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+                  video.muted = true;
+                  video.play();
+              });
+              hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function () {
+                  var audioSpan = document.getElementById("audioSpan");
+                  var audioButtons = "";
+                  for (var i = 0; i < hls.audioTracks.length; i++) {
+                      audioButtons += '<button id="audioButton' + i + '" class="btn btn-outline-primary audioButton';
+                      if (i == 0) {
+                          audioButtons += ' default'
+                      }
+                      audioButtons += '" onclick="toggleAudio(' + i + ')">' + hls.audioTracks[i]["name"] + "</button> "
+                  }
+                  audioSpan.innerHTML = audioButtons
+              })
+          } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+              video.src = "` + video_url + `";
+              video.addEventListener("canplay", function () {
+                  video.play()
+              })
           }
-        });   
+
+          var airPlay = document.getElementById('airplay');
+          if (window.WebKitPlaybackTargetAvailabilityEvent) {
+              video.addEventListener('webkitplaybacktargetavailabilitychanged', function (event) {
+                  switch (event.availability) {
+                      case "available":
+                          airPlay.style.display = 'block';
+                          break;
+
+                      default:
+                          airPlay.style.display = 'none';
+                  }
+
+                  airPlay.addEventListener('click', function () {
+                      video.webkitShowPlaybackTargetPicker();
+                  });
+              });
+          } else {
+              airPlay.style.display = 'none';
+          }
       });
-          
-        if(window.WebKitPlaybackTargetAvailabilityEvent)
-        {
-          video.addEventListener("webkitplaybacktargetavailabilitychanged",function(event)
-          {
-            switch(event.availability)
-            {
-              case "available": $("#airplay").show();
-              break;
-              default: $("#airplay").hide();
-            }
-            airPlay.addEventListener("click",function(){video.webkitShowPlaybackTargetPicker()
-            })
-          })
-        }else{
-          $("#airplay").hide();
-        }
+
+      document.addEventListener("DOMContentLoaded", function () {
+          var pauseButton = document.getElementById("pauseButton");
+          pauseButton.addEventListener("click", function () {
+              if (video.paused) {
+                  video.play();
+              } else {
+                  video.pause();
+              }
+          });
       });
       `
 
     
     var body = pageHeader(javascript, content_protect);
     body += '<section class="section">' + "\n"
-    body += '<div class="container">' + "\n"
+    body += '<div class="container-xl">' + "\n"
 
 
 
     body += '<div class="row mb-3">' + "\n"
-    body += '<div class="col-12">' + "\n"
+    body += '<div class="col">' + "\n"
     body += '<video id="video"'
     if (controls == VALID_CONTROLS[0]) {
         body += ' controls'
     }
-    body += '></video><script>var video=document.getElementById("video");if(Hls.isSupported()){var hls=new Hls('
+    body += '></video>'
 
-    if ( startFrom != VALID_START_FROM[1] ) {
-        body += '{startPosition:0,liveSyncDuration:32400,liveMaxLatencyDuration:32410}'
-    }
-
-    body += ');hls.loadSource("' + video_url + '");hls.attachMedia(video);hls.on(Hls.Events.MEDIA_ATTACHED,function(){video.muted=true;video.play()});hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function(){var audioSpan=document.getElementById("audioSpan");var audioButtons="";for(var i=0;i<hls.audioTracks.length;i++){audioButtons+=\'<button id="audioButton\'+i+\'" class="btn btn-outline-primary audioButton\';if(i==0){audioButtons+=\' default\'}audioButtons+=\'" onclick="toggleAudio(\'+i+\')">\'+hls.audioTracks[i]["name"]+"</button> "}audioSpan.innerHTML=audioButtons})}else if(video.canPlayType("application/vnd.apple.mpegurl")){video.src="' + video_url + '";video.addEventListener("canplay",function(){video.play()})}</script>'
     body += '</div>' + "\n"
     body += '</div>' + "\n"
 
 
     body += '<div class="row mb-3">' + "\n"
-    body += '<div class="col-1">' + "\n"
+    body += '<div class="col-auto">' + "\n"
     body += '<button class="btn btn-outline-primary" onclick="goBack()">Back</button></p>' + "\n"
     body += '</div>' + "\n"
     body += '<div class="col-auto content-align-end">'+ "\n"
@@ -2808,21 +2839,21 @@ app.get('/embed.html', async function(req, res) {
 
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Skip :</label>' + "\n"
-    body += '<div class="col-5">' + "\n"
+    body += '<div class="col-auto">' + "\n"
     body += '<div class="btn-group"> ' + "\n"
-    body += '<button class="btn btn-outline-primary" onclick = "changeTime(-30)">- 30 s</button>'
-    body += '<button class="btn btn-outline-primary" onclick = "changeTime(-10)">- 10 s</button>'
-    body += '<button class="btn btn-outline-primary" onclick = "changeTime(10)">+ 10 s</button>'
-    body += '<button class="btn btn-outline-primary" onclick = "changeTime(30)"> + 30 s</button> '
-    body += '<button class="btn btn-outline-primary" onclick = "changeTime(90)"> + 90 s</button >'
-    body += '<button class="btn btn-outline-primary" onclick = "changeTime(120)">+ 120 s</button> '
-    body += '<button class="btn btn-outline-primary" onclick = "changeTime(video.duration-10)">Latest</button> '
+    body += '<button class="btn btn-outline-primary" onclick = "changeTime(-30)">- 30s</button>' + "\n"
+    body += '<button class="btn btn-outline-primary" onclick = "changeTime(-10)">- 10s</button>' + "\n"
+    body += '<button class="btn btn-outline-primary" onclick = "changeTime(10)">+ 10s</button>' + "\n"
+    body += '<button class="btn btn-outline-primary" onclick = "changeTime(30)">+ 30s</button> ' + "\n"
+    body += '<button class="btn btn-outline-primary" onclick = "changeTime(90)">+ 90s</button >' + "\n"
+    body += '<button class="btn btn-outline-primary" onclick = "changeTime(120)">+ 120s</button> ' + "\n"
+    body += '<button class="btn btn-outline-primary" onclick = "changeTime(video.duration-10)">Latest</button> ' + "\n"
     body += '</div>' + "\n"
-    body += '<button class="btn btn-outline-primary" id="airplay">AirPlay</button>'
+    body += '<button class="btn btn-outline-primary" id="airplay">AirPlay</button>' + "\n"
     body += '</div>' + "\n"
 
     body += '<label class="col-auto col-form-label" for="selType">Playback Rate :</label>' + "\n"
-    body += '<div class="col-1">' + "\n"
+    body += '<div class="col-auto">' + "\n"
     body += '<input type="number" class="form-control" value=1.0 min=0.1 max=16.0 step=0.1 id="playback_rate" onchange="video.defaultPlaybackRate=video.playbackRate=this.value">' + "\n"
     body += '</div>' + "\n"
     body += '</div>' + "\n"
@@ -2830,14 +2861,12 @@ app.get('/embed.html', async function(req, res) {
     body += '<div class="row mb-3">' + "\n"
     body += '<label class="col-auto col-form-label" for="selType">Audio :</label>' + "\n"
     body += '<div class="col-5">' + "\n"
-    body += '<div class="btn-group"> ' + "\n"
     body += '<button class="btn btn-outline-primary" onclick="video.muted=!video.muted">Toggle Mute</button>' + "\n"
     body += '<span id="audioSpan"></span>' + "\n"
     body += '</div>' + "\n"
-    body += '</div>' + "\n"
 
     body += '<label class="col-auto col-form-label" for="selType">Controls:</label>' + "\n"
-    body += '<div class="col-3">' + "\n"
+    body += '<div class="col-auto">' + "\n"
     body += '<div class="btn-group"> ' + "\n"
     body += '<button class="btn btn-outline-primary" onclick="video.controls=!video.controls">Toggle Controls</button>' + "\n"
     body += '<button class="btn btn-outline-primary" id="pauseButton">Pause</button>' + "\n"
